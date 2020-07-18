@@ -1,0 +1,124 @@
+version: 2
+
+anchors:
+  - &prd
+    environment:
+      META_GCLOUD_SERVICE_KEY: ${PRD_GCLOUD_SERVICE_KEY}
+      GOOGLE_CLOUD_KEYFILE_JSON: .credentials/kubernetes@rugamaga-prd.json
+      GCP_PROJECT_ID: rugamaga-prd
+      CLUSTER_NAME: gke-rugamaga
+      CLUSTER_ZONE: asia-northeast1
+      KUSTOMIZATION_ENV: prd
+      PRUNE_LABEL: imager
+      IMAGER_DATABASE_PASSWORD: ${PRD_IMAGER_DATABASE_PASSWORD}
+
+  - &dev
+    environment:
+      META_GCLOUD_SERVICE_KEY: ${DEV_GCLOUD_SERVICE_KEY}
+      GOOGLE_CLOUD_KEYFILE_JSON: .credentials/kubernetes@rugamaga-dev.json
+      GCP_PROJECT_ID: rugamaga-dev
+      CLUSTER_NAME: gke-rugamaga
+      CLUSTER_ZONE: asia-northeast1
+      KUSTOMIZATION_ENV: dev
+      PRUNE_LABEL: imager
+      IMAGER_DATABASE_PASSWORD: ${DEV_IMAGER_DATABASE_PASSWORD}
+
+  - &defaults
+    docker:
+      - image: google/cloud-sdk:300.0.0
+
+  - &diff
+    <<: *defaults
+    steps:
+      - checkout
+      - run:
+          name: Create credential file for gcloud
+          command: eval echo ${META_GCLOUD_SERVICE_KEY} > ${GOOGLE_CLOUD_KEYFILE_JSON}
+      - run:
+          name: Activate credential file for gcloud
+          command: gcloud auth activate-service-account --key-file ${GOOGLE_CLOUD_KEYFILE_JSON}
+      - run:
+          name: Set project for gcloud
+          command: gcloud config set project ${GCP_PROJECT_ID}
+      - run:
+          name: Get credentials for kubectl by using gcloud
+          command: gcloud container clusters get-credentials --zone ${CLUSTER_ZONE} ${CLUSTER_NAME}
+      - run:
+          name: Generate manifests
+          command: manifests/generate.sh
+      - run:
+          name: Manifest server side dryrun
+          command: kubectl apply -k manifests/ --server-dry-run --prune -l pruneLabel=${PRUNE_LABEL}
+      - run:
+          name: Show manifests diff
+          command: kubectl diff -k manifests/ || test $? -gt 1
+
+  - &apply
+    <<: *defaults
+    steps:
+      - checkout
+      - run:
+          name: Create credential file for gcloud
+          command: eval echo $META_GCLOUD_SERVICE_KEY > ${GOOGLE_CLOUD_KEYFILE_JSON}
+      - run:
+          name: Activate credential file for gcloud
+          command: gcloud auth activate-service-account --key-file ${GOOGLE_CLOUD_KEYFILE_JSON}
+      - run:
+          name: Set project for gcloud
+          command: gcloud config set project ${GCP_PROJECT_ID}
+      - run:
+          name: Get credentials for kubectl by using gcloud
+          command: gcloud container clusters get-credentials --zone ${CLUSTER_ZONE} ${CLUSTER_NAME}
+      - run:
+          name: Generate manifests
+          command: manifests/generate.sh
+      - run:
+          name: Apply manifests
+          command: kubectl apply -k manifests/ --prune -l pruneLabel=${PRUNE_LABEL}
+
+jobs:
+  diff_prd:
+    <<: *prd
+    <<: *diff
+
+  diff_dev:
+    <<: *prd
+    <<: *diff
+
+  apply_prd:
+    <<: *dev
+    <<: *apply
+
+  apply_dev:
+    <<: *dev
+    <<: *apply
+
+workflows:
+  version: 2
+
+  prd:
+    jobs:
+      - diff_prd
+      - apply_prd:
+          filters:
+            tags:
+              only: /^PRD\/v.*$/
+            branches:
+              ignore: /.*/
+
+  dev:
+    jobs:
+      - diff_dev
+      - apply_dev:
+          filters:
+            branches:
+              only: master
+
+  dev_explicit:
+    jobs:
+      - apply_dev:
+          filters:
+            tags:
+              only: /^DEV\/v.*$/
+            branches:
+              ignore: /.*/

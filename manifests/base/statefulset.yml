@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: imager-database
+spec:
+  selector:
+    matchLabels:
+      app: imager-database
+  serviceName: imager-database
+  # このシステムに厳密な安定性は要らないがゆえ..。
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: imager-database
+    spec:
+      terminationGracePeriodSeconds: 10
+      restartPolicy: Always
+      containers:
+      - name: postgresql
+        image: postgres:12.3-alpine
+        imagePullPolicy: IfNotPresent
+        readinessProbe:
+          exec:
+            command: ["psql", "-U", "rugamaga", "-c", "SELECT 1"]
+          initialDelaySeconds: 15
+          timeoutSeconds: 2
+        livenessProbe:
+          exec:
+            command: ["psql", "-U", "rugamaga", "-c", "SELECT 1"]
+          initialDelaySeconds: 45
+          timeoutSeconds: 2
+        volumeMounts:
+        - name: vol-imager-database
+          mountPath: /var/lib/postgresql/data
+        ports:
+        - name: port-postgresql
+          containerPort: 5432
+        envFrom:
+          - configMapRef:
+              name: imager-database-config
+          - secretRef:
+              name: imager-database-secret
+  volumeClaimTemplates:
+  - metadata:
+      name: vol-imager-database
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 8Gi
