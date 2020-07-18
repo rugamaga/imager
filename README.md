@@ -15,9 +15,16 @@ https://github.com/rugamaga/rugamaga-terraform を利用して
 rugamaga.net/rugamaga.devを作成しましょう。
 このとき、このアプリのためのサブドメインを切っておいてください。
 
-#### 2. kubernetes用のservice accountを発行しキーを保存する
+#### 2. 各種service accountを発行しキーを保存する
 
-GKEへのマニフェストをapplyできるサービスアカウントを発行しましょう。
+ルートプロジェクトで、GCRアクセス用のサービスアカウントを発行しましょう。
+
+- ROOT環境: `.credentials/repository@rugamaga.json`
+
+として記録します。
+このサービスアカウントに対してはGCSのストレージ管理者権限を付与します。
+
+またGKEへのマニフェストをapplyできるサービスアカウントを発行しましょう。
 取り扱えるだけの権限をもったservice accountを各環境で発行して
 それらのJSONキーをそれぞれ
 
@@ -25,11 +32,13 @@ GKEへのマニフェストをapplyできるサービスアカウントを発行
 - DEV環境: `.credentials/kubernetes@rugamaga-dev.json`
 
 として記録します。
+またこれらのサービスアカウントに対してはGCSのバケット読み取り権限を付与します。
 
 #### 3. CircleCIセットアップ
 
 CircleCIの環境変数を設定します。
 
+- `REPO_GCLOUD_SERVICE_KEY`: `.credentials/repository@rugamaga.json` の中身をすべて貼り付ける
 - `PRD_GCLOUD_SERVICE_KEY`: `.credentials/kubernetes@rugamaga-prd.json` の中身をすべて貼り付ける
 - `DEV_GCLOUD_SERVICE_KEY`: `.credentials/kubernetes@rugamaga-dev.json` の中身をすべて貼り付ける
 - `PRD_IMAGER_DATABASE_PASSWORD`: ランダムなパスワードを決めて設定する。PRD用のDBパスワードになる。
@@ -38,6 +47,10 @@ CircleCIの環境変数を設定します。
 環境を増やす場合はそれに従った環境変数を増やします。
 
 ### CircleCI
+
+#### コンテナビルドする
+
+git pushを行うたびに自動的に行われます。
 
 #### Planする
 

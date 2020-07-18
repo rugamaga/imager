@@ -1,31 +1,60 @@
 version: 2
 
 anchors:
+  - &repo
+    META_GCLOUD_SERVICE_KEY: ${REPO_GCLOUD_SERVICE_KEY}
+    GOOGLE_CLOUD_KEYFILE_JSON: .credentials/repository@rugamaga.json
+    GCP_PROJECT_ID: rugamaga
+    CONTAINER_REGISTRY_URL: asia.gcr.io/rugamaga
+
   - &prd
-    environment:
-      META_GCLOUD_SERVICE_KEY: ${PRD_GCLOUD_SERVICE_KEY}
-      GOOGLE_CLOUD_KEYFILE_JSON: .credentials/kubernetes@rugamaga-prd.json
-      GCP_PROJECT_ID: rugamaga-prd
-      CLUSTER_NAME: gke-rugamaga
-      CLUSTER_ZONE: asia-northeast1
-      KUSTOMIZATION_ENV: prd
-      PRUNE_LABEL: imager
-      IMAGER_DATABASE_PASSWORD: ${PRD_IMAGER_DATABASE_PASSWORD}
+    META_GCLOUD_SERVICE_KEY: ${PRD_GCLOUD_SERVICE_KEY}
+    GOOGLE_CLOUD_KEYFILE_JSON: .credentials/kubernetes@rugamaga-prd.json
+    GCP_PROJECT_ID: rugamaga-prd
+    CLUSTER_NAME: gke-rugamaga
+    CLUSTER_ZONE: asia-northeast1
+    KUSTOMIZATION_ENV: prd
+    PRUNE_LABEL: imager
+    IMAGER_DATABASE_PASSWORD: ${PRD_IMAGER_DATABASE_PASSWORD}
 
   - &dev
-    environment:
-      META_GCLOUD_SERVICE_KEY: ${DEV_GCLOUD_SERVICE_KEY}
-      GOOGLE_CLOUD_KEYFILE_JSON: .credentials/kubernetes@rugamaga-dev.json
-      GCP_PROJECT_ID: rugamaga-dev
-      CLUSTER_NAME: gke-rugamaga
-      CLUSTER_ZONE: asia-northeast1
-      KUSTOMIZATION_ENV: dev
-      PRUNE_LABEL: imager
-      IMAGER_DATABASE_PASSWORD: ${DEV_IMAGER_DATABASE_PASSWORD}
+    META_GCLOUD_SERVICE_KEY: ${DEV_GCLOUD_SERVICE_KEY}
+    GOOGLE_CLOUD_KEYFILE_JSON: .credentials/kubernetes@rugamaga-dev.json
+    GCP_PROJECT_ID: rugamaga-dev
+    CLUSTER_NAME: gke-rugamaga
+    CLUSTER_ZONE: asia-northeast1
+    KUSTOMIZATION_ENV: dev
+    PRUNE_LABEL: imager
+    IMAGER_DATABASE_PASSWORD: ${DEV_IMAGER_DATABASE_PASSWORD}
+
 
   - &defaults
     docker:
       - image: google/cloud-sdk:300.0.0
+
+  - &build
+    <<: *defaults
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Create credential file for gcloud
+          command: eval echo ${META_GCLOUD_SERVICE_KEY} > ${GOOGLE_CLOUD_KEYFILE_JSON}
+      - run:
+          name: Activate credential file for gcloud
+          command: gcloud auth activate-service-account --key-file ${GOOGLE_CLOUD_KEYFILE_JSON}
+      - run:
+          name: Configure docker authentication by using gcloud
+          command: gcloud auth configure-docker --quiet
+      - run:
+          name: Build Dockerfile
+          command: docker build -t ${CONTAINER_IMAGE_NAME}:latest ${BUILD_TARGET}
+      - run:
+          name: Assign tag for docker image
+          command: docker tag ${CONTAINER_IMAGE_NAME}:latest ${CONTAINER_REGISTRY_URL}/${CONTAINER_IMAGE_NAME}:${CIRCLE_SHA1}
+      - run:
+          name: Push docker image to container registry
+          command: docker push ${CONTAINER_REGISTRY_URL}/${CONTAINER_IMAGE_NAME}:${CIRCLE_SHA1}
 
   - &diff
     <<: *defaults
@@ -77,24 +106,39 @@ anchors:
           command: kubectl apply -k manifests/ --prune -l pruneLabel=${PRUNE_LABEL}
 
 jobs:
+  build_server:
+    environment:
+      <<: *repo
+      BUILD_TARGET: server
+      CONTAINER_IMAGE_NAME: imager-server
+    <<: *build
+
   diff_prd:
-    <<: *prd
+    environment:
+      <<: *prd
     <<: *diff
 
   diff_dev:
-    <<: *prd
+    environment:
+      <<: *prd
     <<: *diff
 
   apply_prd:
-    <<: *dev
+    environment:
+      <<: *dev
     <<: *apply
 
   apply_dev:
-    <<: *dev
+    environment:
+      <<: *dev
     <<: *apply
 
 workflows:
   version: 2
+
+  build:
+    jobs:
+      - build_server
 
   prd:
     jobs:
