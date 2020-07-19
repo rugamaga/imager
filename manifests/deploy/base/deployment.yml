@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: imager-server
+  name: imager-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: imager-server
+  template:
+    metadata:
+      labels:
+        app: imager-server
+    spec:
+      containers:
+      - name: imager-server
+        image: imager-server:latest
+        ports:
+        - containerPort: 80
+        envFrom:
+          - configMapRef:
+              name: imager-server-config
+          - secretRef:
+              name: imager-server-secret
+        readinessProbe:
+          httpGet:
+            path: /healthcheck
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /healthcheck
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 60

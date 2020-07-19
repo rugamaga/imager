@@ -27,7 +27,6 @@ anchors:
     PRUNE_LABEL: imager
     IMAGER_DATABASE_PASSWORD: ${DEV_IMAGER_DATABASE_PASSWORD}
 
-
   - &defaults
     docker:
       - image: google/cloud-sdk:300.0.0
@@ -73,14 +72,8 @@ anchors:
           name: Get credentials for kubectl by using gcloud
           command: gcloud container clusters get-credentials --zone ${CLUSTER_ZONE} ${CLUSTER_NAME}
       - run:
-          name: Generate manifests
-          command: manifests/generate.sh
-      - run:
-          name: Manifest server side dryrun
-          command: kubectl apply -k manifests/ --server-dry-run --prune -l pruneLabel=${PRUNE_LABEL}
-      - run:
-          name: Show manifests diff
-          command: kubectl diff -k manifests/ || test $? -gt 1
+          name: Run deploy diff
+          command: manifests/run.sh deploy diff
 
   - &apply
     <<: *defaults
@@ -99,11 +92,8 @@ anchors:
           name: Get credentials for kubectl by using gcloud
           command: gcloud container clusters get-credentials --zone ${CLUSTER_ZONE} ${CLUSTER_NAME}
       - run:
-          name: Generate manifests
-          command: manifests/generate.sh
-      - run:
-          name: Apply manifests
-          command: kubectl apply -k manifests/ --prune -l pruneLabel=${PRUNE_LABEL}
+          name: Run deploy apply
+          command: manifests/run.sh deploy apply
 
 jobs:
   build_server:

@@ -1,3 +1,4 @@
 resources:
   - ./service.yml
   - ./statefulset.yml
+  - ./deployment.yml

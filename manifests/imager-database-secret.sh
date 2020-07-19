@@ -1,5 +1,0 @@
-#! /bin/bash
-
-cat << EOS
-POSTGRES_PASSWORD=${IMAGER_DATABASE_PASSWORD}
-EOS

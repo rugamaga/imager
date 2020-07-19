@@ -1,2 +1,3 @@
 /imager-database-secret.env
+/imager-server-secret.env
 /kustomization.yml

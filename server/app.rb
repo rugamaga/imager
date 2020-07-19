@@ -5,8 +5,12 @@ configure {
 }
 
 class Imager < Sinatra::Base
+  get '/healthcheck' do
+    '{"status":"ok"}'
+  end
+
   get '/hello' do
-    return 'hello imager!'
+    'hello imager!'
   end
 
   run! if app_file == $0
