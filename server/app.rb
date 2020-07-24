@@ -1,8 +1,4 @@
-require 'sinatra'
-
-configure {
-  set :server, :puma
-}
+require 'sinatra/base'
 
 class Imager < Sinatra::Base
   get '/healthcheck' do

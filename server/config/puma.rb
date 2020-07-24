@@ -1,8 +1,7 @@
 root = "#{Dir.getwd}"
 
-bind "tcp://0.0.0.0:7890"
-pidfile "#{root}/tmp/puma/pid"
-state_path "#{root}/tmp/puma/state"
+bind "tcp://0.0.0.0:80"
+workers 3
+
+preload_app!
 rackup "#{root}/config.ru"
-threads 4, 8
-activate_control_app

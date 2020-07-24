@@ -5,27 +5,29 @@ anchors:
     META_GCLOUD_SERVICE_KEY: ${REPO_GCLOUD_SERVICE_KEY}
     GOOGLE_CLOUD_KEYFILE_JSON: .credentials/repository@rugamaga.json
     GCP_PROJECT_ID: rugamaga
-    CONTAINER_REGISTRY_URL: asia.gcr.io/rugamaga
+    REGISTRY: asia.gcr.io/rugamaga
 
   - &prd
+    ENV: prd
     META_GCLOUD_SERVICE_KEY: ${PRD_GCLOUD_SERVICE_KEY}
     GOOGLE_CLOUD_KEYFILE_JSON: .credentials/kubernetes@rugamaga-prd.json
     GCP_PROJECT_ID: rugamaga-prd
     CLUSTER_NAME: gke-rugamaga
-    CLUSTER_ZONE: asia-northeast1
-    KUSTOMIZATION_ENV: prd
-    PRUNE_LABEL: imager
-    IMAGER_DATABASE_PASSWORD: ${PRD_IMAGER_DATABASE_PASSWORD}
+    CLUSTER_ZONE: asia-northeast1-a
+    REGISTRY: asia.gcr.io/rugamaga
+    META_IMAGER_DATABASE_PASSWORD: ${PRD_IMAGER_DATABASE_PASSWORD}
+    META_DATABASE_URL: ${PRD_DATABASE_URL}
 
   - &dev
+    ENV: dev
     META_GCLOUD_SERVICE_KEY: ${DEV_GCLOUD_SERVICE_KEY}
     GOOGLE_CLOUD_KEYFILE_JSON: .credentials/kubernetes@rugamaga-dev.json
     GCP_PROJECT_ID: rugamaga-dev
     CLUSTER_NAME: gke-rugamaga
-    CLUSTER_ZONE: asia-northeast1
-    KUSTOMIZATION_ENV: dev
-    PRUNE_LABEL: imager
-    IMAGER_DATABASE_PASSWORD: ${DEV_IMAGER_DATABASE_PASSWORD}
+    CLUSTER_ZONE: asia-northeast1-a
+    REGISTRY: asia.gcr.io/rugamaga
+    META_IMAGER_DATABASE_PASSWORD: ${DEV_IMAGER_DATABASE_PASSWORD}
+    META_DATABASE_URL: ${DEV_DATABASE_URL}
 
   - &defaults
     docker:
@@ -46,16 +48,15 @@ anchors:
           name: Configure docker authentication by using gcloud
           command: gcloud auth configure-docker --quiet
       - run:
-          name: Build Dockerfile
-          command: docker build -t ${CONTAINER_IMAGE_NAME}:latest ${BUILD_TARGET}
-      - run:
-          name: Assign tag for docker image
-          command: docker tag ${CONTAINER_IMAGE_NAME}:latest ${CONTAINER_REGISTRY_URL}/${CONTAINER_IMAGE_NAME}:${CIRCLE_SHA1}
-      - run:
-          name: Push docker image to container registry
-          command: docker push ${CONTAINER_REGISTRY_URL}/${CONTAINER_IMAGE_NAME}:${CIRCLE_SHA1}
+          name: Build and push
+          command: |
+            export SYSTEM=${CIRCLE_PROJECT_REPONAME}
+            export TAG=${CIRCLE_SHA1}
+            export DATABASE_URL=$(eval "echo -n ${META_DATABASE_URL}")
+            export IMAGER_DATABASE_PASSWORD=$(eval "echo -n ${META_IMAGER_DATABASE_PASSWORD}")
+            ./scripts/build.sh
 
-  - &diff
+  - &plan
     <<: *defaults
     steps:
       - checkout
@@ -72,8 +73,13 @@ anchors:
           name: Get credentials for kubectl by using gcloud
           command: gcloud container clusters get-credentials --zone ${CLUSTER_ZONE} ${CLUSTER_NAME}
       - run:
-          name: Run deploy diff
-          command: manifests/run.sh deploy diff
+          name: Run deploy plan
+          command: |
+            export SYSTEM=${CIRCLE_PROJECT_REPONAME}
+            export TAG=${CIRCLE_SHA1}
+            export DATABASE_URL=$(eval "echo -n ${META_DATABASE_URL}")
+            export IMAGER_DATABASE_PASSWORD=$(eval "echo -n ${META_IMAGER_DATABASE_PASSWORD}")
+            ./scripts/plan.sh
 
   - &apply
     <<: *defaults
@@ -81,7 +87,7 @@ anchors:
       - checkout
       - run:
           name: Create credential file for gcloud
-          command: eval echo $META_GCLOUD_SERVICE_KEY > ${GOOGLE_CLOUD_KEYFILE_JSON}
+          command: eval echo ${META_GCLOUD_SERVICE_KEY} > ${GOOGLE_CLOUD_KEYFILE_JSON}
       - run:
           name: Activate credential file for gcloud
           command: gcloud auth activate-service-account --key-file ${GOOGLE_CLOUD_KEYFILE_JSON}
@@ -93,34 +99,74 @@ anchors:
           command: gcloud container clusters get-credentials --zone ${CLUSTER_ZONE} ${CLUSTER_NAME}
       - run:
           name: Run deploy apply
-          command: manifests/run.sh deploy apply
+          command: |
+            export SYSTEM=${CIRCLE_PROJECT_REPONAME}
+            export TAG=${CIRCLE_SHA1}
+            export DATABASE_URL=$(eval "echo -n ${META_DATABASE_URL}")
+            export IMAGER_DATABASE_PASSWORD=$(eval "echo -n ${META_IMAGER_DATABASE_PASSWORD}")
+            ./scripts/apply.sh
 
 jobs:
-  build_server:
+  server-build:
     environment:
       <<: *repo
-      BUILD_TARGET: server
-      CONTAINER_IMAGE_NAME: imager-server
+      COMPONENT: server
     <<: *build
 
-  diff_prd:
+  server-plan-prd:
     environment:
       <<: *prd
-    <<: *diff
+      COMPONENT: server
+      ACTION: deploy
+    <<: *plan
 
-  diff_dev:
+  server-plan-dev:
     environment:
       <<: *prd
-    <<: *diff
+      COMPONENT: server
+      ACTION: deploy
+    <<: *plan
 
-  apply_prd:
+  server-apply-prd:
     environment:
       <<: *dev
+      COMPONENT: server
+      ACTION: deploy
     <<: *apply
 
-  apply_dev:
+  server-apply-dev:
     environment:
       <<: *dev
+      COMPONENT: server
+      ACTION: deploy
+    <<: *apply
+
+  database-plan-prd:
+    environment:
+      <<: *prd
+      COMPONENT: database
+      ACTION: deploy
+    <<: *plan
+
+  database-plan-dev:
+    environment:
+      <<: *prd
+      COMPONENT: database
+      ACTION: deploy
+    <<: *plan
+
+  database-apply-prd:
+    environment:
+      <<: *dev
+      COMPONENT: database
+      ACTION: deploy
+    <<: *apply
+
+  database-apply-dev:
+    environment:
+      <<: *dev
+      COMPONENT: database
+      ACTION: deploy
     <<: *apply
 
 workflows:
@@ -128,12 +174,23 @@ workflows:
 
   build:
     jobs:
-      - build_server
+      - server-build
 
   prd:
     jobs:
-      - diff_prd
-      - apply_prd:
+      - server-plan-prd
+      - database-plan-prd
+      - server-apply-prd:
+          requires:
+            - server-plan-prd
+          filters:
+            tags:
+              only: /^PRD\/v.*$/
+            branches:
+              ignore: /.*/
+      - database-apply-prd:
+          requires:
+            - database-plan-prd
           filters:
             tags:
               only: /^PRD\/v.*$/
@@ -142,17 +199,38 @@ workflows:
 
   dev:
     jobs:
-      - diff_dev
-      - apply_dev:
+      - server-plan-dev
+      - database-plan-dev
+      - server-apply-dev:
+          requires:
+            - server-plan-dev
+          filters:
+            branches:
+              only: master
+      - database-apply-dev:
+          requires:
+            - database-plan-dev
           filters:
             branches:
               only: master
 
   dev_explicit:
     jobs:
-      - apply_dev:
+      - server-plan-dev:
           filters:
             tags:
               only: /^DEV\/v.*$/
             branches:
               ignore: /.*/
+      - database-plan-dev:
+          filters:
+            tags:
+              only: /^DEV\/v.*$/
+            branches:
+              ignore: /.*/
+      - server-apply-dev:
+          requires:
+            - server-plan-dev
+      - database-apply-dev:
+          requires:
+            - database-plan-dev

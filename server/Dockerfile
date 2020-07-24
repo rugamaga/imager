@@ -16,4 +16,4 @@ RUN bundle install
 COPY . /app
 EXPOSE 80
 
-CMD ["bundle", "exec", "ruby", "./app"]
+CMD ["bundle", "exec", "puma", "-C", "config/puma.rb"]

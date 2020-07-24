@@ -1,0 +1,24 @@
+#! /bin/sh
+
+check_envs() {
+  NEEDS=$*
+  for VAR in ${NEEDS}; do
+    [ -n "$(eval \${${VAR}+set})" ] || {
+      echo "Environment variable ${VAR} is necessary to use this script" 1>&2
+      exit 1
+    }
+  done
+}
+
+set_envs() {
+  export SCRIPT_DIR=$(cd "$(dirname $0)/"; pwd)
+  export SYSTEM_DIR=$(cd "${SCRIPT_DIR}/../"; pwd)
+  export COMPONENT_DIR=$(cd "${SYSTEM_DIR}/${COMPONENT}"; pwd)
+  export MANIFEST_DIR="${COMPONENT_DIR}/manifests"
+  export ACTION_DIR="${MANIFEST_DIR}/${ACTION}"
+
+  export IMAGE_NAME="${REGISTRY}/${SYSTEM}-${COMPONENT}"
+  export IMAGE_TAG="${TAG}"
+
+  export PRUNE_LABEL="${SYSTEM}-${COMPONENT}-${ACTION}"
+}
