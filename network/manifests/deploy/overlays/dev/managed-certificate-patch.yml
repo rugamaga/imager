@@ -1,0 +1,7 @@
+apiVersion: networking.gke.io/v1beta1
+kind: ManagedCertificate
+metadata:
+  name: imager-certificate
+spec:
+  domains:
+    - image.rugamaga.dev

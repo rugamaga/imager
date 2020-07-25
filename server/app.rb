@@ -1,11 +1,11 @@
 require 'sinatra/base'
 
 class Imager < Sinatra::Base
-  get '/healthcheck' do
+  get '/api/healthcheck' do
     '{"status":"ok"}'
   end
 
-  get '/hello' do
+  get '/api/hello' do
     'hello imager!'
   end
 

@@ -1,0 +1,3 @@
+resources:
+  - ./ingress.yml
+  - ./managed-certificate.yml

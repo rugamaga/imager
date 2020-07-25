@@ -1,0 +1,11 @@
+bases:
+  - ../../base
+patchesStrategicMerge:
+  - managed-certificate-patch.yml
+patchesJson6902:
+  - target:
+      group: extensions
+      version: v1beta1
+      kind: Ingress
+      name: imager
+    path: ingress-patch.yml

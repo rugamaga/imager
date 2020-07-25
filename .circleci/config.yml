@@ -122,14 +122,14 @@ jobs:
 
   server-plan-dev:
     environment:
-      <<: *prd
+      <<: *dev
       COMPONENT: server
       ACTION: deploy
     <<: *plan
 
   server-apply-prd:
     environment:
-      <<: *dev
+      <<: *prd
       COMPONENT: server
       ACTION: deploy
     <<: *apply
@@ -150,14 +150,14 @@ jobs:
 
   database-plan-dev:
     environment:
-      <<: *prd
+      <<: *dev
       COMPONENT: database
       ACTION: deploy
     <<: *plan
 
   database-apply-prd:
     environment:
-      <<: *dev
+      <<: *prd
       COMPONENT: database
       ACTION: deploy
     <<: *apply
@@ -166,6 +166,34 @@ jobs:
     environment:
       <<: *dev
       COMPONENT: database
+      ACTION: deploy
+    <<: *apply
+
+  network-plan-prd:
+    environment:
+      <<: *prd
+      COMPONENT: network
+      ACTION: deploy
+    <<: *plan
+
+  network-plan-dev:
+    environment:
+      <<: *dev
+      COMPONENT: network
+      ACTION: deploy
+    <<: *plan
+
+  network-apply-prd:
+    environment:
+      <<: *prd
+      COMPONENT: network
+      ACTION: deploy
+    <<: *apply
+
+  network-apply-dev:
+    environment:
+      <<: *dev
+      COMPONENT: network
       ACTION: deploy
     <<: *apply
 
@@ -178,8 +206,24 @@ workflows:
 
   prd:
     jobs:
-      - server-plan-prd
-      - database-plan-prd
+      - server-plan-prd:
+          filters:
+            tags:
+              only: /^PRD\/v.*$/
+            branches:
+              ignore: /.*/
+      - database-plan-prd:
+          filters:
+            tags:
+              only: /^PRD\/v.*$/
+            branches:
+              ignore: /.*/
+      - network-plan-prd:
+          filters:
+            tags:
+              only: /^PRD\/v.*$/
+            branches:
+              ignore: /.*/
       - server-apply-prd:
           requires:
             - server-plan-prd
@@ -196,11 +240,20 @@ workflows:
               only: /^PRD\/v.*$/
             branches:
               ignore: /.*/
+      - network-apply-prd:
+          requires:
+            - network-plan-prd
+          filters:
+            tags:
+              only: /^PRD\/v.*$/
+            branches:
+              ignore: /.*/
 
   dev:
     jobs:
       - server-plan-dev
       - database-plan-dev
+      - network-plan-dev
       - server-apply-dev:
           requires:
             - server-plan-dev
@@ -210,6 +263,12 @@ workflows:
       - database-apply-dev:
           requires:
             - database-plan-dev
+          filters:
+            branches:
+              only: master
+      - network-apply-dev:
+          requires:
+            - network-plan-dev
           filters:
             branches:
               only: master
@@ -228,9 +287,18 @@ workflows:
               only: /^DEV\/v.*$/
             branches:
               ignore: /.*/
+      - network-plan-dev:
+          filters:
+            tags:
+              only: /^DEV\/v.*$/
+            branches:
+              ignore: /.*/
       - server-apply-dev:
           requires:
             - server-plan-dev
       - database-apply-dev:
           requires:
             - database-plan-dev
+      - network-apply-dev:
+          requires:
+            - network-plan-dev

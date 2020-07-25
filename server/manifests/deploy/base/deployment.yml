@@ -5,7 +5,7 @@ metadata:
     app: imager-server
   name: imager-server
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: imager-server
@@ -17,6 +17,13 @@ spec:
       containers:
       - name: imager-server
         image: imager-server:latest
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
         ports:
         - containerPort: 80
         envFrom:
@@ -26,13 +33,13 @@ spec:
               name: imager-server-secret
         readinessProbe:
           httpGet:
-            path: /healthcheck
+            path: /api/healthcheck
             port: 80
           initialDelaySeconds: 5
           periodSeconds: 5
         livenessProbe:
           httpGet:
-            path: /healthcheck
+            path: /api/healthcheck
             port: 80
           initialDelaySeconds: 5
           periodSeconds: 60
