@@ -107,6 +107,40 @@ anchors:
             ./scripts/apply.sh
 
 jobs:
+  client-build:
+    environment:
+      <<: *repo
+      COMPONENT: client
+    <<: *build
+
+  client-plan-prd:
+    environment:
+      <<: *prd
+      COMPONENT: client
+      ACTION: deploy
+    <<: *plan
+
+  client-plan-dev:
+    environment:
+      <<: *dev
+      COMPONENT: client
+      ACTION: deploy
+    <<: *plan
+
+  client-apply-prd:
+    environment:
+      <<: *prd
+      COMPONENT: client
+      ACTION: deploy
+    <<: *apply
+
+  client-apply-dev:
+    environment:
+      <<: *dev
+      COMPONENT: client
+      ACTION: deploy
+    <<: *apply
+
   server-build:
     environment:
       <<: *repo
@@ -202,10 +236,17 @@ workflows:
 
   build:
     jobs:
+      - client-build
       - server-build
 
   prd:
     jobs:
+      - client-plan-prd:
+          filters:
+            tags:
+              only: /^PRD\/v.*$/
+            branches:
+              ignore: /.*/
       - server-plan-prd:
           filters:
             tags:
@@ -219,6 +260,14 @@ workflows:
             branches:
               ignore: /.*/
       - network-plan-prd:
+          filters:
+            tags:
+              only: /^PRD\/v.*$/
+            branches:
+              ignore: /.*/
+      - client-apply-prd:
+          requires:
+            - client-plan-prd
           filters:
             tags:
               only: /^PRD\/v.*$/
@@ -251,9 +300,16 @@ workflows:
 
   dev:
     jobs:
+      - client-plan-dev
       - server-plan-dev
       - database-plan-dev
       - network-plan-dev
+      - client-apply-dev:
+          requires:
+            - client-plan-dev
+          filters:
+            branches:
+              only: master
       - server-apply-dev:
           requires:
             - server-plan-dev
@@ -275,6 +331,12 @@ workflows:
 
   dev_explicit:
     jobs:
+      - client-plan-dev:
+          filters:
+            tags:
+              only: /^DEV\/v.*$/
+            branches:
+              ignore: /.*/
       - server-plan-dev:
           filters:
             tags:
@@ -293,6 +355,9 @@ workflows:
               only: /^DEV\/v.*$/
             branches:
               ignore: /.*/
+      - client-apply-dev:
+          requires:
+            - client-plan-dev
       - server-apply-dev:
           requires:
             - server-plan-dev

@@ -17,7 +17,7 @@ spec:
         backend:
           serviceName: imager-server
           servicePort: 80
-    #   - path: /*
-    #     backend:
-    #       serviceName: imager-client
-    #       servicePort: 80
+      - path: /*
+        backend:
+          serviceName: imager-client
+          servicePort: 80
