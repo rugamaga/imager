@@ -6,6 +6,7 @@ metadata:
   name: imager-client
 spec:
   replicas: 2
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: imager-client
